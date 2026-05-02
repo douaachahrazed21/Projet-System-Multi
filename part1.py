@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import os
 from pathlib import Path
-###################################### PART 1 : PREPROCESSIONG ############################################
+
 def load_frames(frames_dir):
     """Load all frames from a directory, sorted by name."""
     frames_dir = Path(frames_dir)

@@ -1,24 +1,16 @@
 import numpy as np
 from scipy.fft import dctn, idctn
 
-# ============================================================
-# PARAMÈTRES PRINCIPAUX
-# ============================================================
 
-GOP_SIZE = 12       # Taille du GOP
-SEARCH_WINDOW = 8   # Fenêtre de recherche ±8 pixels
-BLOCK_SIZE = 16     # Taille des macroblocs : 16×16 pixels
-QUALITY = 50        # Facteur de qualité
-
-# Structure du GOP avec B-frames :
-# I B B P B B P B B P B B I B B P ...
-# Chaque P-frame est précédée de 2 B-frames
-B_FRAME_COUNT = 2   # Nombre de B-frames entre chaque I/P frame
+GOP_SIZE = 12       
+SEARCH_WINDOW = 8   
+BLOCK_SIZE = 16     
+QUALITY = 50       
 
 
-# ============================================================
-# MATRICES DE QUANTIFICATION
-# ============================================================
+B_FRAME_COUNT = 2   
+
+
 
 QUANT_MATRIX = np.array([
     [16, 11, 10, 16, 24,  40,  51,  61],
@@ -50,9 +42,7 @@ def get_quant_matrix_16(quality=50):
     return qm_16
 
 
-# ============================================================
-# FONCTIONS DCT / IDCT
-# ============================================================
+
 
 def split_into_blocks(channel, block_size=8):
     h, w = channel.shape
@@ -97,9 +87,6 @@ def decode_channel(encoded_blocks, original_shape, quant_matrix):
     return merge_blocks(decoded_blocks, original_shape, block_size=8)
 
 
-# ============================================================
-# FONCTIONS I-FRAME
-# ============================================================
 
 def encode_iframe(Y, Cb, Cr, quality=50):
     qm = get_quant_matrix(quality)
@@ -118,9 +105,7 @@ def decode_iframe(encoded_channels, shapes, quant_matrix):
     return Y_dec.astype(np.uint8), Cb_dec.astype(np.uint8), Cr_dec.astype(np.uint8)
 
 
-# ============================================================
-# FONCTIONS UTILITAIRES MACROBLOCS
-# ============================================================
+
 
 def extract_block(frame, y, x, size=16):
     h, w = frame.shape
@@ -161,9 +146,6 @@ def find_best_match(current_block, ref_frame, y, x, search_window):
     return best_dy, best_dx
 
 
-# ============================================================
-# ENCODAGE / DÉCODAGE DU RÉSIDU 16×16
-# ============================================================
 
 def encode_residual(residual, qm_16):
     dct_coeffs = dctn(residual.astype(np.float32), norm='ortho')
@@ -177,15 +159,9 @@ def decode_residual(quantised, qm_16):
     return residual
 
 
-# ============================================================
-# ENCODAGE / DÉCODAGE P-FRAME (inchangé)
-# ============================================================
 
 def encode_pframe(current_Y, ref_Y, quality):
-    """
-    Encode une P-frame avec motion estimation depuis UNE référence
-    (la frame précédente reconstruite).
-    """
+
     qm_16 = get_quant_matrix_16(quality)
     h, w = current_Y.shape
     motion_vectors = []
@@ -226,36 +202,15 @@ def decode_pframe(motion_vectors, residuals_enc, ref_Y, frame_shape, quality):
     return np.clip(reconstructed_Y, 0, 255).astype(np.uint8)
 
 
-# ============================================================
-# ENCODAGE / DÉCODAGE B-FRAME (NOUVEAU !)
-# ============================================================
 
 def encode_bframe(current_Y, ref_Y_past, ref_Y_future, quality):
-    """
-    Encode une B-frame avec interpolation bidirectionnelle.
 
-    Contrairement aux P-frames qui utilisent UNE référence (le passé),
-    les B-frames utilisent DEUX références :
-    - ref_Y_past   : frame précédente reconstruite (ex: I ou P avant)
-    - ref_Y_future : frame suivante reconstruite  (ex: P ou I après)
-
-    Pour chaque macroblock :
-    1. Cherche le meilleur match dans ref_Y_past  → motion vector forward
-    2. Cherche le meilleur match dans ref_Y_future → motion vector backward
-    3. Prédiction = moyenne des deux blocs trouvés (interpolation)
-    4. Résidu = bloc courant - prédiction interpolée
-    5. Encode le résidu avec DCT 16×16
-
-    Pourquoi deux références ?
-    → La prédiction est meilleure car on peut interpoler le mouvement
-    → Les résidus sont plus petits → meilleure compression
-    """
     qm_16 = get_quant_matrix_16(quality)
     h, w = current_Y.shape
 
     # Stocke les motion vectors forward (vers passé) et backward (vers futur)
-    mv_forward  = []   # liste de (dy, dx) vers ref_past
-    mv_backward = []   # liste de (dy, dx) vers ref_future
+    mv_forward  = []  
+    mv_backward = []   
     residuals_enc = []
 
     for y in range(0, h, BLOCK_SIZE):
@@ -296,16 +251,7 @@ def encode_bframe(current_Y, ref_Y_past, ref_Y_future, quality):
 
 def decode_bframe(mv_forward, mv_backward, residuals_enc,
                   ref_Y_past, ref_Y_future, frame_shape, quality):
-    """
-    Reconstruit une B-frame depuis les motion vectors et résidus.
 
-    Pour chaque macroblock :
-    1. Extrait bloc prédit depuis ref_Y_past  avec mv_forward
-    2. Extrait bloc prédit depuis ref_Y_future avec mv_backward
-    3. Interpolation : moyenne des deux
-    4. Décode le résidu
-    5. bloc reconstruit = interpolation + résidu décodé
-    """
     qm_16 = get_quant_matrix_16(quality)
     h, w = frame_shape
     reconstructed_Y = np.zeros((h, w), dtype=np.float32)
@@ -345,25 +291,8 @@ def decode_bframe(mv_forward, mv_backward, residuals_enc,
     return np.clip(reconstructed_Y, 0, 255).astype(np.uint8)
 
 
-# ============================================================
-# PIPELINE COMPLET : ENCODE TOUTES LES FRAMES (I + P + B)
-# ============================================================
-
 def encode_video(preprocessed, quality=QUALITY):
-    """
-    Encode toutes les frames avec la structure GOP suivante :
 
-    Avec GOP_SIZE=12 et B_FRAME_COUNT=2 :
-    Position : 0  1  2  3  4  5  6  7  8  9  10 11
-    Type      : I  B  B  P  B  B  P  B  B  P  B  B
-
-    IMPORTANT sur l'ordre d'encodage des B-frames :
-    Les B-frames ont besoin de leur frame future comme référence.
-    Donc on encode d'abord les I/P frames, puis les B-frames entre elles.
-
-    On utilise un buffer pour stocker les frames en attente
-    jusqu'à ce qu'on ait la référence future disponible.
-    """
     qm = get_quant_matrix(quality)
     encoded_frames = []
 
@@ -391,8 +320,7 @@ def encode_video(preprocessed, quality=QUALITY):
     print(' '.join(frame_types[:GOP_SIZE]))
 
     # ---- Étape 2 : encoder dans l'ordre de décodage ----
-    # On encode les I et P d'abord pour avoir les références,
-    # puis on encode les B-frames entre elles
+ 
 
     # Buffer pour stocker les données encodées dans l'ordre original
     encoded_buffer = [None] * total
@@ -443,7 +371,6 @@ def encode_video(preprocessed, quality=QUALITY):
             }
 
     # Passe 2 : encode toutes les B-frames
-    # Maintenant on a toutes les références I/P disponibles
     for idx in range(total):
         if frame_types[idx] != 'B':
             continue
@@ -504,11 +431,11 @@ def encode_video(preprocessed, quality=QUALITY):
 
         encoded_buffer[idx] = {
             "type":           "B",
-            "mv_forward":     mv_forward,     # motion vectors vers le passé
-            "mv_backward":    mv_backward,    # motion vectors vers le futur
+            "mv_forward":     mv_forward,    
+            "mv_backward":    mv_backward,    
             "residuals_enc":  residuals_enc,
-            "past_ref_idx":   past_ref_idx,   # index de la référence passée
-            "future_ref_idx": future_ref_idx, # index de la référence future
+            "past_ref_idx":   past_ref_idx,   
+            "future_ref_idx": future_ref_idx,
             "Cb_enc":         Cb_enc,
             "Cr_enc":         Cr_enc,
             "Cb_shape":       Cb_shape,
@@ -523,18 +450,10 @@ def encode_video(preprocessed, quality=QUALITY):
     return encoded_frames, reconstructed_refs
 
 
-# ============================================================
-# DÉCODAGE COMPLET (I + P + B)
-# ============================================================
+
 
 def decode_video(encoded_frames, reconstructed_refs):
-    """
-    Décode toutes les frames dans l'ordre original.
 
-    Pour les B-frames, on utilise reconstructed_refs qui contient
-    déjà les références I/P reconstruites pendant l'encodage.
-    (En vrai décodeur, on les recalculerait à la volée)
-    """
     decoded_frames = []
     ref_Y = None
 
@@ -598,9 +517,6 @@ def decode_video(encoded_frames, reconstructed_refs):
     return decoded_frames
 
 
-# ============================================================
-# EXÉCUTION
-# ============================================================
 
 # Encode toutes les frames
 encoded_frames, reconstructed_refs = encode_video(preprocessed, quality=QUALITY)
