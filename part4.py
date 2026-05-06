@@ -20,17 +20,10 @@ def write_bin(encoded_frames, output_path=OUTPUT_BIN):
             ftype   = frame_data["type"]
             payload = {k: v for k, v in frame_data.items() if k != "type"}
 
-            # conversion des motion vectors → int16 pour réduire l'empreinte pickle
+            # conversion motion vectors → int16 pour réduire l'empreinte pickle
             if ftype == 'P' and "motion_vectors" in payload:
                 payload["motion_vectors"] = np.array(
                     payload["motion_vectors"], dtype=np.int16)
-            if ftype == 'B':
-                if "mv_forward"  in payload:
-                    payload["mv_forward"]  = np.array(
-                        payload["mv_forward"],  dtype=np.int16)
-                if "mv_backward" in payload:
-                    payload["mv_backward"] = np.array(
-                        payload["mv_backward"], dtype=np.int16)
 
             compressed = zlib.compress(pickle.dumps(payload), level=6)
             f.write(ftype.encode('ascii'))             # 1 byte : type
@@ -38,8 +31,8 @@ def write_bin(encoded_frames, output_path=OUTPUT_BIN):
             f.write(compressed)
 
     file_size = os.path.getsize(output_path)
-    print(f"Written {len(encoded_frames)} frames → '{output_path}'")
-    print(f"Compressed size : {file_size:,} bytes  ({file_size/1024:.1f} KB)")
+    print(f"[Part 4] Written {len(encoded_frames)} frames → '{output_path}'")
+    print(f"[Part 4] Compressed size : {file_size:,} bytes  ({file_size/1024:.1f} KB)")
     return file_size
 
 
@@ -69,27 +62,21 @@ def read_bin(input_path=OUTPUT_BIN):
             ftype   = type_byte.decode('ascii')
             payload = pickle.loads(zlib.decompress(payload_bytes))
 
-            # restauration des motion vectors numpy → liste de tuples (dy, dx)
+            # restauration motion vectors numpy → liste de tuples (dy, dx)
             if ftype == 'P' and "motion_vectors" in payload:
                 mv = payload["motion_vectors"]
                 payload["motion_vectors"] = [
                     (int(mv[i, 0]), int(mv[i, 1])) for i in range(len(mv))]
-            if ftype == 'B':
-                if "mv_forward" in payload:
-                    mv = payload["mv_forward"]
-                    payload["mv_forward"]  = [
-                        (int(mv[i, 0]), int(mv[i, 1])) for i in range(len(mv))]
-                if "mv_backward" in payload:
-                    mv = payload["mv_backward"]
-                    payload["mv_backward"] = [
-                        (int(mv[i, 0]), int(mv[i, 1])) for i in range(len(mv))]
 
             payload["type"] = ftype
             encoded_frames.append(payload)
             frame_idx += 1
 
-    print(f"Read {len(encoded_frames)} frames from '{input_path}'")
+    print(f"[Part 4] Read {len(encoded_frames)} frames from '{input_path}'")
     return encoded_frames
+
+
+
 
 
 
@@ -97,14 +84,14 @@ def read_bin(input_path=OUTPUT_BIN):
 # taille brute Y+Cb+Cr de toutes les frames
 original_size = sum(Y.nbytes + Cb.nbytes + Cr.nbytes
                     for Y, Cb, Cr in preprocessed)
-print(f"Original raw size : {original_size:,} bytes  ({original_size/1024:.1f} KB)")
+print(f"[Part 4] Original raw size : {original_size:,} bytes  ({original_size/1024:.1f} KB)")
 
 compressed_size = write_bin(encoded_frames, OUTPUT_BIN)
-print(f"Compression ratio : {original_size / compressed_size:.2f}x")
+
+print(f"[Part 4] Compression ratio : {original_size / compressed_size:.2f}x")
 
 # vérification round-trip
 encoded_frames_loaded = read_bin(OUTPUT_BIN)
-print(f"Round-trip OK : {len(encoded_frames_loaded)} frames")
+print(f"[Part 4] Round-trip OK : {len(encoded_frames_loaded)} frames")
 print(f"  I: {sum(1 for f in encoded_frames_loaded if f['type']=='I')}  "
-      f"P: {sum(1 for f in encoded_frames_loaded if f['type']=='P')}  "
-      f"B: {sum(1 for f in encoded_frames_loaded if f['type']=='B')}")
+      f"P: {sum(1 for f in encoded_frames_loaded if f['type']=='P')}")
