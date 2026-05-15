@@ -4,9 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from scipy.fft import dctn, idctn
 
-########################################## PART 5 : EVALUATION & VISUALISATION ##############################################
-# Requires: preprocessed, frames_bgr (Part 1), encoded_frames, decoded_frames (Part 3),
-#           original_size, compressed_size (Part 4)
+########################################## PART 5 : EVALUATION & VISUALISATION #############################################
 
 
 # ---- 5A : Quality Metrics ----
