@@ -169,7 +169,7 @@ def visualise_pipeline(preprocessed, frames_bgr, encoded_frames,
     print(f"[Part 5] Figure saved → '{save_path}'")
 
 
-# ---- Bonus : Compression ratio vs Quality Factor ----
+# ----  Compression ratio vs Quality Factor: ----
 
 # preprocessed → courbe ratio en fonction du quality factor
 def plot_ratio_vs_quality(preprocessed,
