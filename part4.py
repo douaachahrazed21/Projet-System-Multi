@@ -5,7 +5,7 @@ import os
 import numpy as np
 
 ########################################## PART 4 : ENTROPY CODING & BINARY FILE I/O ##########################################
-# Requires: preprocessed (Part 1), encoded_frames (Part 3)
+
 
 OUTPUT_BIN = "output.bin"
 
