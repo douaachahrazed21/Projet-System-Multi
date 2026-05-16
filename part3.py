@@ -1,9 +1,7 @@
 import numpy as np
 from scipy.fft import dctn, idctn
 
-# ============================================================
 # PARAMÈTRES PRINCIPAUX
-# ============================================================
 
 GOP_SIZE = 5        # Toutes les 5 frames → I-frame, le reste → P-frames
 SEARCH_WINDOW = 8   # Cherche le meilleur bloc dans ±8 pixels
@@ -11,9 +9,7 @@ BLOCK_SIZE = 16     # Taille des macroblocs : 16×16 pixels
 QUALITY = 50        # Facteur de qualité pour la quantification
 
 
-# ============================================================
 # MATRICES DE QUANTIFICATION
-# ============================================================
 
 QUANT_MATRIX = np.array([
     [16, 11, 10, 16, 24,  40,  51,  61],
@@ -28,11 +24,7 @@ QUANT_MATRIX = np.array([
 
 
 def get_quant_matrix(quality=50):
-    """
-    Retourne la matrice de quantification 8×8 selon le facteur de qualité.
-    quality=100 → peu de compression
-    quality=1   → compression maximale
-    """
+ 
     if quality <= 0: quality = 1
     if quality > 100: quality = 100
 
@@ -47,44 +39,27 @@ def get_quant_matrix(quality=50):
 
 
 def get_quant_matrix_16(quality=50):
-    """
-    Retourne une matrice de quantification 16×16 pour les résidus des P-frames.
-    On agrandit la matrice 8×8 en répétant chaque valeur 2 fois
-    en hauteur et en largeur avec np.kron.
 
-    Exemple :
-    [[16, 11],      [[16, 16, 11, 11],
-     [12, 12]]  →    [16, 16, 11, 11],
-                     [12, 12, 12, 12],
-                     [12, 12, 12, 12]]
-    """
     qm_8 = get_quant_matrix(quality)
     qm_16 = np.kron(qm_8, np.ones((2, 2), dtype=np.float32))
     return qm_16
 
 
-# ============================================================
+
 # FONCTIONS DCT / IDCT (réutilisées de la Part 2)
-# ============================================================
 
 def dct_block(block):
-    """
-    Applique la DCT 2D sur un bloc.
-    Soustrait 128 pour centrer les valeurs autour de 0.
-    """
+  
     return dctn(block.astype(np.float32) - 128, norm='ortho')
 
 
 def idct_block(block):
-    """
-    Applique la DCT inverse (IDCT).
-    Rajoute 128 pour revenir dans l'espace 0..255.
-    """
+  
     return idctn(block, norm='ortho') + 128
 
 
 def split_into_blocks(channel, block_size=8):
-    """Découpe un canal 2D en blocs de block_size × block_size."""
+ 
     h, w = channel.shape
     pad_h = (block_size - h % block_size) % block_size
     pad_w = (block_size - w % block_size) % block_size
@@ -97,7 +72,7 @@ def split_into_blocks(channel, block_size=8):
 
 
 def merge_blocks(blocks, original_shape, block_size=8):
-    """Reconstruit un canal à partir de blocs."""
+
     num_bh, num_bw, _, _ = blocks.shape
     blocks = blocks.transpose(0, 2, 1, 3)
     channel = blocks.reshape(num_bh * block_size, num_bw * block_size)
@@ -106,10 +81,7 @@ def merge_blocks(blocks, original_shape, block_size=8):
 
 
 def encode_channel(channel, quant_matrix):
-    """
-    Encode un canal complet avec DCT + quantification (8×8 blocs).
-    Utilisé pour les I-frames et pour Cb/Cr des P-frames.
-    """
+
     blocks, original_shape = split_into_blocks(channel, block_size=8)
     num_bh, num_bw, _, _ = blocks.shape
     encoded = np.zeros_like(blocks, dtype=np.int16)
@@ -125,9 +97,7 @@ def encode_channel(channel, quant_matrix):
 
 
 def decode_channel(encoded_blocks, original_shape, quant_matrix):
-    """
-    Décode un canal complet : dequantification + IDCT.
-    """
+
     num_bh, num_bw, _, _ = encoded_blocks.shape
     decoded_blocks = np.zeros_like(encoded_blocks, dtype=np.float32)
 
@@ -141,12 +111,11 @@ def decode_channel(encoded_blocks, original_shape, quant_matrix):
     return merge_blocks(decoded_blocks, original_shape, block_size=8)
 
 
-# ============================================================
+
 # FONCTIONS I-FRAME (réutilisées de la Part 2)
-# ============================================================
 
 def encode_iframe(Y, Cb, Cr, quality=50):
-    """Encode une I-frame complète (Y, Cb, Cr) avec DCT 8×8."""
+
     qm = get_quant_matrix(quality)
     Y_enc,  Y_shape  = encode_channel(Y,  qm)
     Cb_enc, Cb_shape = encode_channel(Cb, qm)
@@ -155,7 +124,7 @@ def encode_iframe(Y, Cb, Cr, quality=50):
 
 
 def decode_iframe(encoded_channels, shapes, quant_matrix):
-    """Décode une I-frame complète."""
+
     Y_enc, Cb_enc, Cr_enc = encoded_channels
     Y_shape, Cb_shape, Cr_shape = shapes
     Y_dec  = decode_channel(Y_enc,  Y_shape,  quant_matrix)
@@ -164,15 +133,11 @@ def decode_iframe(encoded_channels, shapes, quant_matrix):
     return Y_dec.astype(np.uint8), Cb_dec.astype(np.uint8), Cr_dec.astype(np.uint8)
 
 
-# ============================================================
+
 # FONCTIONS UTILITAIRES POUR LES MACROBLOCS 16×16
-# ============================================================
 
 def extract_block(frame, y, x, size=16):
-    """
-    Extrait un bloc de taille size×size depuis une frame.
-    Si le bloc dépasse les bords, on complète avec des zéros.
-    """
+
     h, w = frame.shape
     y_end = min(y + size, h)
     x_end = min(x + size, w)
@@ -188,27 +153,14 @@ def extract_block(frame, y, x, size=16):
 
 
 def compute_sad(block1, block2):
-    """
-    Calcule la SAD (Sum of Absolute Differences) entre deux blocs.
-    SAD = 0        → blocs identiques
-    SAD très grand → blocs très différents
-    On cherche toujours le bloc avec la SAD MINIMALE.
-    """
     return np.sum(np.abs(block1.astype(np.float32) -
                          block2.astype(np.float32)))
 
 
-# ============================================================
+
 # ESTIMATION DE MOUVEMENT
-# ============================================================
 
 def find_best_match(current_block, ref_frame, y, x, search_window):
-    """
-    Cherche le bloc le plus similaire dans la frame de référence.
-
-    Parcourt toutes les positions dans la fenêtre ±search_window
-    et retourne le motion vector (dy, dx) du meilleur match.
-    """
     h, w = ref_frame.shape
     best_sad = float('inf')
     best_dy  = 0
@@ -239,16 +191,11 @@ def find_best_match(current_block, ref_frame, y, x, search_window):
     return best_dy, best_dx
 
 
-# ============================================================
+
 # ENCODAGE / DÉCODAGE DU RÉSIDU 16×16
-# ============================================================
 
 def encode_residual(residual, qm_16):
-    """
-    Encode le résidu 16×16 avec DCT + quantification.
-    Pas de -128 car le résidu est déjà centré autour de 0.
-    qm_16 doit être une matrice 16×16 (pas 8×8 !)
-    """
+
     # DCT sur le résidu 16×16
     dct_coeffs = dctn(residual.astype(np.float32), norm='ortho')
 
@@ -259,10 +206,6 @@ def encode_residual(residual, qm_16):
 
 
 def decode_residual(quantised, qm_16):
-    """
-    Décode le résidu : dequantification + IDCT.
-    qm_16 doit être une matrice 16×16 (pas 8×8 !)
-    """
     # Dequantification
     dct_coeffs = (quantised * qm_16).astype(np.float32)
 
@@ -272,23 +215,11 @@ def decode_residual(quantised, qm_16):
     return residual
 
 
-# ============================================================
+
 # ENCODAGE D'UNE P-FRAME
-# ============================================================
 
 def encode_pframe(current_Y, ref_Y, quality):
-    """
-    Encode une P-frame (canal Y uniquement pour motion estimation).
 
-    Pour chaque macroblock 16×16 :
-    1. Trouve le meilleur match dans ref_Y → motion vector (dy, dx)
-    2. Calcule le résidu = bloc courant - bloc prédit
-    3. Encode le résidu avec DCT 16×16 + quantification
-
-    Retourne :
-    - motion_vectors : liste de (dy, dx) pour chaque macroblock
-    - residuals_enc  : liste des résidus encodés
-    """
     # Matrice 16×16 pour les résidus
     qm_16 = get_quant_matrix_16(quality)
 
@@ -320,19 +251,10 @@ def encode_pframe(current_Y, ref_Y, quality):
     return motion_vectors, residuals_enc
 
 
-# ============================================================
 # DÉCODAGE D'UNE P-FRAME
-# ============================================================
 
 def decode_pframe(motion_vectors, residuals_enc, ref_Y, frame_shape, quality):
-    """
-    Reconstruit une P-frame depuis les motion vectors et résidus.
 
-    Pour chaque macroblock :
-    1. Utilise le motion vector pour extraire le bloc prédit
-    2. Décode le résidu
-    3. bloc reconstruit = bloc prédit + résidu décodé
-    """
     # Matrice 16×16 pour les résidus
     qm_16 = get_quant_matrix_16(quality)
 
@@ -367,27 +289,11 @@ def decode_pframe(motion_vectors, residuals_enc, ref_Y, frame_shape, quality):
     return np.clip(reconstructed_Y, 0, 255).astype(np.uint8)
 
 
-# ============================================================
+
 # PIPELINE COMPLET : ENCODE TOUTES LES FRAMES
-# ============================================================
 
 def encode_video(preprocessed, quality=QUALITY):
-    """
-    Encode toutes les frames en mélangeant I-frames et P-frames.
 
-    GOP_SIZE=5 → structure :
-    Frame 0 → I
-    Frame 1 → P (référence : frame 0 reconstruite)
-    Frame 2 → P (référence : frame 1 reconstruite)
-    Frame 3 → P (référence : frame 2 reconstruite)
-    Frame 4 → P (référence : frame 3 reconstruite)
-    Frame 5 → I
-    ...
-
-    IMPORTANT : les P-frames utilisent toujours la frame
-    RECONSTRUITE comme référence (pas l'originale) pour que
-    l'encodeur et le décodeur restent synchronisés.
-    """
     qm = get_quant_matrix(quality)
     encoded_frames = []
     ref_Y = None  # canal Y de la dernière frame reconstruite
@@ -455,15 +361,10 @@ def encode_video(preprocessed, quality=QUALITY):
     return encoded_frames
 
 
-# ============================================================
 # DÉCODAGE COMPLET DE LA VIDÉO
-# ============================================================
 
 def decode_video(encoded_frames):
-    """
-    Décode toutes les frames (I et P) pour reconstruire la vidéo.
-    Retourne une liste de tuples (Y, Cb, Cr) reconstruits.
-    """
+
     decoded_frames = []
     ref_Y = None
 
@@ -506,9 +407,7 @@ def decode_video(encoded_frames):
     return decoded_frames
 
 
-# ============================================================
 # EXÉCUTION
-# ============================================================
 
 # Encode toutes les frames
 encoded_frames = encode_video(preprocessed, quality=QUALITY)
