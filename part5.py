@@ -77,7 +77,7 @@ def visualise_pipeline(preprocessed, frames_bgr, encoded_frames,
 
     # Row 3 : pipeline DCT sur un bloc 8×8 central
     h0, w0 = Y0.shape
-    by, bx = (h0 // 2) // 8 * 8, (w0 // 2) // 8 * 8
+    by, bx = (h0 // 19) // 8 * 8, (w0 // 19) // 8 * 8
     raw_block = Y0[by:by+8, bx:bx+8].astype(np.float32)
     qm        = get_quant_matrix(QUALITY)
     dct_c     = dctn(raw_block - 128, norm='ortho')
