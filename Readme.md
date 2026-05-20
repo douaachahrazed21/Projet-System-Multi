@@ -32,12 +32,13 @@ Projet-System-Multi/
 ├── part5.py                    # Part 5 implementation
 │
 ├── output.bin                  # Encoded binary output
-├── outputgop1.bin
-├── outputgop4.bin
-├── outputgop5.bin
-├── outputgop8.bin
-├── outputgop12.bin
-├── outputgop24.bin
+├── outputs/                 
+│   ├──outputgop1.bin           # Encoded binary outputs
+│   ├──outputgop4.bin
+│   ├──outputgop5.bin
+│   ├──outputgop8.bin
+│   ├──outputgop12.bin
+│   └──outputgop24.bin
 │
 ├── ratio_vs_gop.PNG            # Compression ratio analysis
 ├── ratio_vs_quality.png        # Quality/compression comparison
